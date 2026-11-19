@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Password Lab</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 10 10%22><circle cx=%225%22 cy=%225%22 r=%224%22 fill=%22%23e5172f%22/></svg>">
+<link rel="stylesheet" href="theme.css">
+<style>
+  .pw{font:600 22px var(--mono);padding:16px 18px;letter-spacing:.04em}
+  .segs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:12px 0} .segs i{height:8px;border-radius:6px;background:var(--bg2);transition:.3s}
+  .crack{font:800 34px var(--font)}
+  .pat{padding:9px 12px;border-left:3px solid var(--warn);background:var(--surface);border-radius:6px;margin-top:8px;font-size:13px}
+  .hash{font:11.5px var(--mono);color:var(--muted);word-break:break-all}
+  table.t td{vertical-align:top}
+  .cr{color:var(--red2);font-weight:700} .safe{color:var(--ok);font-weight:700}
+  .same{background:rgba(229,23,47,.12)}
+  .pane{display:none}.pane.on{display:block}
+  .warnbox{border:1px solid rgba(245,165,36,.4);background:rgba(245,165,36,.07);padding:10px 14px;border-radius:10px;font-size:12.5px;color:var(--warn)}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="dot"></span>PASSWORD LAB <small>laboratoire pédagogique sur les mots de passe</small></div>
+  <div class="spacer"></div><span class="badge">usage éducatif · comptes fictifs uniquement</span>
+</header>
+<main class="wrap">
+  <div class="tabs" id="tabs"><div class="tab on" data-p="tester">🔑 Testeur</div><div class="tab" data-p="compare">⚖ Hachages</div><div class="tab" data-p="lab">🧪 Labo d'attaque</div><div class="tab" data-p="bench">⏱ Benchmark C</div></div>
+
+  <section class="pane on" id="tester">
+    <div class="grid" style="grid-template-columns:1.2fr 1fr;gap:20px">
+      <div class="card">
+        <label>Tapez un mot de passe (analysé localement par le labo, jamais enregistré)</label>
+        <input class="input pw" id="pw" placeholder="Soleil2024!" autocomplete="off" spellcheck="false">
+        <div class="segs" id="segs"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="row between"><h2 id="label" style="margin:0">—</h2><span class="mono dim" id="bits"></span></div>
+        <div id="patterns"></div>
+        <div class="dim" style="font-size:12.5px;margin-top:14px">Entropie « naïve » (longueur × alphabet) : <b class="mono" id="naive">–</b> bits · entropie réaliste, en tenant compte des motifs : <b class="mono red" id="real">–</b> bits.</div>
+      </div>
+      <div class="card"><div class="kicker">Temps pour le casser</div><div class="dim" style="font-size:12px;margin:4px 0 12px">Attaque hors ligne, une carte graphique RTX 4090, empreinte volée en base</div>
+        <div class="col" id="times"></div></div>
+    </div>
+  </section>
+
+  <section class="pane" id="compare">
+    <div class="card"><div class="row between"><div><h2 style="margin:0">Une même entrée, six façons de la stocker</h2><div class="dim" style="font-size:12.5px">Mot de passe testé : <b class="mono" id="cmpPw">motdepasse</b>. Le hachage est calculé deux fois pour montrer l'effet du sel.</div></div>
+      <button class="btn" id="cmpGo">Comparer</button></div>
+      <table class="t" id="cmp" style="margin-top:14px"></table>
+      <canvas id="cmpChart" style="width:100%;height:220px;margin-top:16px"></canvas>
+      <div class="dim" style="font-size:12px">Barres : log₁₀ du temps (en secondes) pour casser ce mot de passe. Chaque graduation multiplie par 10.</div></div>
+  </section>
+
+  <section class="pane" id="lab">
+    <div class="grid" style="grid-template-columns:340px 1fr;gap:20px">
+      <div class="col">
+        <div class="card col"><h3 style="margin:0">Créer un compte fictif</h3>
+          <input class="input" id="uName" placeholder="Nom"><input class="input" id="uPw" placeholder="Mot de passe"><select id="uAlgo"></select>
+          <button class="btn" id="uAdd">Ajouter au labo</button></div>
+        <div class="card col"><h3 style="margin:0">Scénarios prêts à l'emploi</h3>
+          <button class="btn ghost sm" data-demo="md5">6 comptes en MD5 sans sel</button><button class="btn ghost sm" data-demo="sha256_salt">6 comptes en SHA-256 salé</button>
+          <button class="btn ghost sm" data-demo="scrypt">6 comptes en scrypt</button><button class="btn ghost sm" id="reset">Vider le labo</button></div>
+        <div class="warnbox">L'attaque ne peut viser que les comptes créés ici. Le but est de comprendre pourquoi il faut un sel et une fonction lente, pas de casser des empreintes réelles.</div>
+      </div>
+      <div class="card"><div class="row between"><h3 style="margin:0">Base de données du labo</h3><div class="row"><label style="margin:0">Budget</label><select id="budget" style="width:110px"><option value="4">4 s</option><option value="8" selected>8 s</option><option value="20">20 s</option></select><button class="btn" id="attack">☠ Lancer l'attaque par dictionnaire</button></div></div>
+        <table class="t" id="users" style="margin-top:12px"></table><div id="atkStats" style="margin-top:14px"></div></div>
+    </div>
+  </section>
+
+  <section class="pane" id="bench">
+    <div class="card"><div class="row between"><div><h2 style="margin:0">Débit de hachage sur cette machine</h2><div class="dim" style="font-size:12.5px" id="engine">Programme C (OpenSSL EVP) compilé avec <code>make -C bench</code>.</div></div><button class="btn" id="benchGo">Lancer le benchmark</button></div>
+      <canvas id="benchChart" style="width:100%;height:260px;margin-top:16px"></canvas><table class="t" id="benchT" style="margin-top:12px"></table></div>
+  </section>
+</main>
+<script src="ui.js"></script><script src="charts.js"></script><script src="app.js"></script>
+</body>
+</html>
